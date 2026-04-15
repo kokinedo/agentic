@@ -31,11 +31,31 @@ cd agentic
 uv sync
 ```
 
-Set the required environment variables:
+## Authentication
+
+agentic supports multiple AI providers. Use the built-in login flow to authenticate:
 
 ```bash
-export ANTHROPIC_API_KEY="your-api-key"
-export TAVILY_API_KEY="your-tavily-key"
+agentic login                       # default: Claude
+agentic login --provider openai     # OpenAI
+agentic login --provider gemini     # Google Gemini
+```
+
+This opens your browser to the provider's API key page, prompts you to paste the key, and stores it locally at `~/.config/agentic/credentials.json`.
+
+Alternatively, set environment variables directly:
+
+```bash
+export ANTHROPIC_API_KEY="your-key"   # Claude
+export OPENAI_API_KEY="your-key"      # OpenAI
+export GEMINI_API_KEY="your-key"      # Gemini
+export TAVILY_API_KEY="your-key"      # Web search (optional)
+```
+
+To remove stored credentials:
+
+```bash
+agentic logout --provider claude
 ```
 
 ## Usage
@@ -50,6 +70,13 @@ Adjust research depth (number of agent loop iterations):
 
 ```bash
 agentic "Compare transformer and state-space architectures" --depth 3
+```
+
+Use a different provider:
+
+```bash
+agentic research "explain quantum tunneling" --provider openai
+agentic research "explain quantum tunneling" --provider gemini --model gemini-2.0-flash
 ```
 
 Export results to markdown:
