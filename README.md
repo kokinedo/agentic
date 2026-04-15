@@ -4,6 +4,8 @@ Multi-agent AI research system.
 
 A CLI tool where multiple AI agents -- Researcher, Synthesizer, Critic -- collaborate in real-time to answer complex research questions. Watch them think, search, and debate in a live terminal UI.
 
+![agentic in action](docs/screenshot.svg)
+
 ## Features
 
 - Multi-agent orchestration with distinct roles (Researcher, Synthesizer, Critic)
