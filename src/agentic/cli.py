@@ -15,8 +15,10 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from agentic import auth
 from agentic.models import Depth
 from agentic.orchestrator import Orchestrator
+from agentic.providers import get_provider
 from agentic.ui.theme import LOGO
 
 app = typer.Typer(
@@ -34,9 +36,13 @@ DEPTH_MAP = {
 }
 
 
-def _run_research(question: str, depth: Depth, model: str) -> dict:
+def _run_research(question: str, depth: Depth, model: str, provider_name: str, api_key: str) -> dict:
     """Run the async orchestrator and return session data."""
-    orchestrator = Orchestrator(model=model, depth=depth)
+    provider = get_provider(provider_name, api_key)
+    if model is None:
+        model = provider.default_model()
+
+    orchestrator = Orchestrator(model=model, depth=depth, provider=provider)
     session = asyncio.run(orchestrator.run(question, console))
 
     return {
@@ -57,19 +63,21 @@ def _run_research(question: str, depth: Depth, model: str) -> dict:
 def research(
     question: str = typer.Argument(..., help="The research question to investigate"),
     depth: str = typer.Option("medium", "--depth", "-d", help="Research depth: shallow, medium, deep"),
-    model: str = typer.Option("claude-sonnet-4-20250514", "--model", "-m", help="Claude model to use"),
+    model: str = typer.Option(None, "--model", "-m", help="Model to use (default depends on provider)"),
+    provider: str = typer.Option(None, "--provider", "-p", help="AI provider: claude, openai, gemini"),
     output: str | None = typer.Option(None, "--output", "-o", help="Save output to file (markdown or json)"),
 ) -> None:
     """Research a question using multiple AI agents."""
-    # Validate depth
     depth_enum = DEPTH_MAP.get(depth.lower())
     if depth_enum is None:
         console.print(f"[red]Invalid depth '{depth}'. Choose: shallow, medium, deep[/red]")
         raise typer.Exit(code=1)
 
-    # Check API key
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        console.print("[red]ANTHROPIC_API_KEY environment variable is required.[/red]")
+    # Resolve provider and API key
+    provider_name = provider or auth.get_default_provider()
+    api_key = auth.get_api_key(provider_name)
+    if not api_key:
+        console.print(f"[red]No API key for {provider_name}. Run: agentic login --provider {provider_name}[/red]")
         raise typer.Exit(code=1)
 
     if not os.environ.get("TAVILY_API_KEY"):
@@ -77,11 +85,11 @@ def research(
 
     # Print logo
     console.print(Text.from_markup(f"[bold cyan]{LOGO}[/bold cyan]"))
+    console.print(f"[dim]Provider: {provider_name}[/dim]")
     console.print()
 
-    # Run research
     try:
-        result = _run_research(question, depth_enum, model)
+        result = _run_research(question, depth_enum, model, provider_name, api_key)
     except KeyboardInterrupt:
         console.print("\n[yellow]Research interrupted.[/yellow]")
         raise typer.Exit(code=130)
@@ -93,18 +101,15 @@ def research(
     console.print()
     console.print(Panel("[bold]Research Complete[/bold]", border_style="green"))
     console.print()
-
     console.print(Markdown(result["final_answer"]))
     console.print()
 
-    # Key points
     if result["key_points"]:
         console.print(Panel("[bold]Key Points[/bold]", border_style="cyan"))
         for i, point in enumerate(result["key_points"], 1):
             console.print(f"  [cyan]{i}.[/cyan] {point}")
         console.print()
 
-    # Sources table
     if result["sources"]:
         table = Table(title="Sources", border_style="dim")
         table.add_column("#", style="dim", width=4)
@@ -114,14 +119,12 @@ def research(
         console.print(table)
         console.print()
 
-    # Meta info
     console.print(
         f"[dim]Confidence: {result['confidence']} | "
         f"Cycles: {result['cycles']} | "
         f"Approved: {result['approved']}[/dim]"
     )
 
-    # Save output
     if output:
         out_path = Path(output)
         if out_path.suffix == ".json":
@@ -138,6 +141,22 @@ def research(
             )
             out_path.write_text(md_content)
         console.print(f"\n[green]Output saved to {out_path}[/green]")
+
+
+@app.command()
+def login(
+    provider: str = typer.Option("claude", "--provider", "-p", help="Provider: claude, openai, gemini"),
+) -> None:
+    """Authenticate with an AI provider."""
+    auth.login(provider)
+
+
+@app.command()
+def logout(
+    provider: str = typer.Option("claude", "--provider", "-p", help="Provider: claude, openai, gemini"),
+) -> None:
+    """Remove stored credentials for a provider."""
+    auth.logout(provider)
 
 
 if __name__ == "__main__":

@@ -6,9 +6,8 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import Any
 
-from anthropic import AsyncAnthropic
-
 from agentic.models import AgentEvent
+from agentic.providers.base import Provider
 
 
 class BaseAgent(ABC):
@@ -20,11 +19,11 @@ class BaseAgent(ABC):
     def __init__(
         self,
         model: str,
-        client: AsyncAnthropic,
+        provider: Provider,
         event_queue: asyncio.Queue[AgentEvent],
     ) -> None:
         self.model = model
-        self._client = client
+        self._provider = provider
         self._event_queue = event_queue
 
     async def _emit(self, event_type: str, content: str = "") -> None:
@@ -37,17 +36,11 @@ class BaseAgent(ABC):
         await self._event_queue.put(event)
 
     async def _stream_response(self, system: str, messages: list[dict[str, Any]]) -> str:
-        """Stream a response from Claude and emit streaming events."""
+        """Stream a response from the provider and emit streaming events."""
         full_text = ""
-        async with self._client.messages.stream(
-            model=self.model,
-            max_tokens=4096,
-            system=system,
-            messages=messages,
-        ) as stream:
-            async for text in stream.text_stream:
-                full_text += text
-                await self._emit("streaming", text)
+        async for text in self._provider.stream(system, messages, self.model):
+            full_text += text
+            await self._emit("streaming", text)
         return full_text
 
     @abstractmethod

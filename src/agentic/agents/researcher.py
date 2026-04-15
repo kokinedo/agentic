@@ -7,9 +7,8 @@ import json
 import re
 from typing import Any
 
-from anthropic import AsyncAnthropic
-
 from agentic.agents.base import BaseAgent
+from agentic.providers.base import Provider
 from agentic.models import ResearchFindings, SearchResult
 from agentic.search import TavilySearch
 
@@ -23,11 +22,11 @@ class Researcher(BaseAgent):
     def __init__(
         self,
         model: str,
-        client: AsyncAnthropic,
+        provider: Provider,
         event_queue: asyncio.Queue,
         search: TavilySearch,
     ) -> None:
-        super().__init__(model, client, event_queue)
+        super().__init__(model, provider, event_queue)
         self._search = search
 
     def _parse_queries(self, text: str) -> list[str]:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 
-from anthropic import AsyncAnthropic
 from rich.console import Console
 
 from agentic.agents.critic import Critic
@@ -15,6 +14,7 @@ from agentic.models import (
     Depth,
     ResearchSession,
 )
+from agentic.providers.base import Provider
 from agentic.search import TavilySearch
 from agentic.ui.display import ResearchDisplay
 
@@ -22,27 +22,26 @@ from agentic.ui.display import ResearchDisplay
 class Orchestrator:
     """Coordinates the Researcher -> Synthesizer -> Critic loop."""
 
-    def __init__(self, model: str, depth: Depth) -> None:
+    def __init__(self, model: str, depth: Depth, provider: Provider) -> None:
         self.model = model
         self.depth = depth
-        self._client = AsyncAnthropic()
         self._event_queue: asyncio.Queue[AgentEvent] = asyncio.Queue()
         self._search = TavilySearch()
 
         self._researcher = Researcher(
             model=model,
-            client=self._client,
+            provider=provider,
             event_queue=self._event_queue,
             search=self._search,
         )
         self._synthesizer = Synthesizer(
             model=model,
-            client=self._client,
+            provider=provider,
             event_queue=self._event_queue,
         )
         self._critic = Critic(
             model=model,
-            client=self._client,
+            provider=provider,
             event_queue=self._event_queue,
         )
 
